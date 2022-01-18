@@ -4,31 +4,35 @@ from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from requests.exceptions import InvalidSchema
 
 
 class Page():
     def __init__(self, url: str, line_width: int, img: bool):
         self.logger = logging.getLogger(__name__)
         self.url = url
-        self.domain = str()
+        self.domain = urlparse(self.url).hostname
         self.line_width = line_width
         self.image_filter = img
+        self.document_path = f'{Path(__file__).resolve().parent.parent}/files/{self.domain}.txt'
 
     def get_useful_content(self):
         its_url = self._validate()
+        print(its_url)
         if not its_url:
             self.logger.info(f'Адрес:"{self.url}" является некорректным.')
-        page_data: dict = self._parse()
-        self._create_document(page_data=page_data)
+            return False
+        else:
+            page_data: dict = self._parse()
+            self._create_document(page_data=page_data)
+            return True
 
     def _validate(self) -> bool:
-        if ('https://' or 'http://') in self.url:
-            self.domain = urlparse(self.url).hostname
-            test_request = requests.get(self.url)
-            if test_request.status_code != 200:
-                return False
-            return True
-        else:
+        try:
+            if requests.get(self.url).status_code == 200:
+                return True
+            return False
+        except InvalidSchema:
             return False
 
     def _parse(self) -> dict:
@@ -49,7 +53,7 @@ class Page():
         return page_data
 
     def _create_document(self, page_data: dict) -> None:
-        document = open(f'{Path(__file__).resolve().parent.parent}/files/{self.domain}.txt', 'w+')
+        document = open(self.document_path, 'w')
         document.write(page_data['headline'] + '\n')
         article = list()
         start = 0
